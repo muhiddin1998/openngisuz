@@ -15,7 +15,7 @@ except:
     pass
 
 HISTORY_FILE = "history.json"
-user_state = {}  # Foydalanuvchi qaysi kategoriyada ekanligini saqlash uchun
+user_state = {}  
 
 SERVICES = {
     "turar": {
@@ -92,7 +92,6 @@ def create_kml(feature, cadastre_number):
         f.write(kml_content)
     return filename
 
-# 1. Asosiy menyu (Start bosganda chiqadi)
 def get_main_keyboard():
     markup = ReplyKeyboardMarkup(resize_keyboard=True, row_width=1)
     markup.add(
@@ -101,7 +100,6 @@ def get_main_keyboard():
     )
     return markup
 
-# 2. Kategoriyalar menyusi
 def get_category_keyboard():
     markup = ReplyKeyboardMarkup(resize_keyboard=True, row_width=1)
     markup.add(
@@ -120,20 +118,24 @@ def send_welcome(message):
     welcome_text = (
         "Assalomu alaykum! 🏛\n\n"
         "Elektron kadastr ma'lumotlar botiga xush kelibsiz.\n"
-        "Ma'lumot qidirish uchun quyidagi tugmani bosing:"
+        "Kerakli bo'limni tanlang:"
     )
     bot.send_message(chat_id, welcome_text, reply_markup=get_main_keyboard())
 
+@bot.message_handler(func=lambda message: message.text == "🔍 Kadastr ma'lumotlarini izlash")
+def choose_category_menu(message):
+    chat_id = message.chat.id
+    bot.send_message(
+        chat_id, 
+        "Qaysi yo'nalish bo'yicha ma'lumot qidirmoqchisiz? Marhamat, quyidagilardan birini tanlang:", 
+        reply_markup=get_category_keyboard()
+    )
+
 @bot.message_handler(func=lambda message: message.text == "🔙 Asosiy menyu")
-def back_to_main(message):
+def go_back(message):
     chat_id = message.chat.id
     user_state[chat_id] = None
     bot.send_message(chat_id, "Asosiy menyu:", reply_markup=get_main_keyboard())
-
-@bot.message_handler(func=lambda message: message.text == "🔍 Kadastr ma'lumotlarini izlash")
-def choose_search_category(message):
-    chat_id = message.chat.id
-    bot.send_message(chat_id, "Qaysi yo'nalish bo'yicha ma'lumot qidirmoqchisiz? Marhamat, quyidagilardan birini tanlang:", reply_markup=get_category_keyboard())
 
 @bot.message_handler(func=lambda message: message.text == "📜 Tarixni ko'rish")
 def show_history(message):
@@ -145,7 +147,7 @@ def show_history(message):
         text = "📜 *Sizning qidiruvlar tarixingiz:*\n\n"
         for idx, item in enumerate(history[str_user_id], 1):
             text += f"{idx}. `{item['cadastre_number']}` ({item.get('category', '-')}) — _{item['date']}_\n"
-        bot.send_message(chat_id, text, parse_mode='Markdown', reply_markup=get_main_keyboard())
+        bot.send_message(chat_id, text, parse_mode='HTML', reply_markup=get_main_keyboard())
     else:
         bot.send_message(chat_id, "Sizda hali qidiruvlar tarixi mavjud emas.", reply_markup=get_main_keyboard())
 
@@ -156,13 +158,13 @@ def set_category(message):
     
     if "Turar joylar" in text:
         user_state[chat_id] = "turar"
-        cat_name = "Turar joylar"
+        cat_name = "🏠 Turar joylar"
     elif "Noturar joylar" in text:
         user_state[chat_id] = "noturar"
-        cat_name = "Noturar joylar"
+        cat_name = "🏢 Noturar joylar"
     else:
         user_state[chat_id] = "agr"
-        cat_name = "Qishloq xo'jaligi yerlari"
+        cat_name = "🌾 Qishloq xo'jaligi yerlari"
         
     bot.send_message(
         chat_id, 
@@ -174,9 +176,8 @@ def set_category(message):
 @bot.message_handler(func=lambda message: True)
 def handle_cadastre(message):
     chat_id = message.chat.id
-    
-    # Agar foydalanuvchi kategoriya tanlamagan bo'lsa
     current_category = user_state.get(chat_id)
+    
     if not current_category:
         bot.send_message(chat_id, "Iltimos, avval '🔍 Kadastr ma'lumotlarini izlash' tugmasini bosing:", reply_markup=get_main_keyboard())
         return
@@ -197,6 +198,7 @@ def process_cadastre_request(chat_id, cadastre_number, api_url, cat_title):
     
     params = {
         'where': f"cadastral_number LIKE '%{cadastre_number}%'",
+        *params if 'params' in locals() else [],
         'outFields': '*',
         'f': 'json',
         'returnGeometry': 'true',
