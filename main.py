@@ -145,7 +145,7 @@ def set_category(message):
         
     bot.send_message(
         chat_id, 
-        f"✅ *{cat_name}* tanlandi.\n\nEndi kadastr raqamini kiriting (masalan: `14:07:42:03:01:0443`):", 
+        f"✅ *{cat_name}* tanlandi.\n\nEndi shu bo'limga tegishli kadastr raqamini kiriting (masalan: `14:07:42:03:01:0443`):", 
         parse_mode='Markdown',
         reply_markup=get_main_keyboard()
     )
@@ -169,6 +169,7 @@ def handle_cadastre(message):
     threading.Thread(target=process_cadastre_request, args=(chat_id, cadastre_number, api_url, cat_title)).start()
 
 def process_cadastre_request(chat_id, cadastre_number, api_url, cat_title):
+    session = requests.Session()
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
         'Accept': 'application/json, text/plain, */*',
@@ -184,7 +185,7 @@ def process_cadastre_request(chat_id, cadastre_number, api_url, cat_title):
     }
     
     try:
-        response = requests.get(api_url, params=params, headers=headers, timeout=50)
+        response = session.get(api_url, params=params, headers=headers, timeout=90)
         data = response.json()
         
         if 'features' in data and len(data['features']) > 0:
@@ -219,10 +220,10 @@ def process_cadastre_request(chat_id, cadastre_number, api_url, cat_title):
                     bot.send_document(chat_id, f, caption="Xaritadagi kml fayli", reply_markup=get_main_keyboard())
                 os.remove(kml_file)
         else:
-            bot.send_message(chat_id, f"[-] '{cadastre_number}' raqami bo'yicha {cat_title} bazasidan hech qanday ma'lumot topilmadi.", reply_markup=get_main_keyboard())
+            bot.send_message(chat_id, f"[-] '{cadastre_number}' raqami bo'yicha {cat_title} bazasidan hech qanday ma'lumot topilmadi.\n\n*Eslatma:* Kiritilgan raqam tanlangan kategoriya bazasiga to'g'ri kelishiga ishonch hosil qiling.", parse_mode='Markdown', reply_markup=get_main_keyboard())
             
     except requests.exceptions.Timeout:
-        bot.send_message(chat_id, "[!] Server ishlamayapti yoki vaqtincha javob bermayapti (50 sekund ichida javob kelmadi).", reply_markup=get_main_keyboard())
+        bot.send_message(chat_id, "[!] Server juda sekin ishlayapti yoki vaqtincha javob bermayapti (90 soniya ichida javob kelmadi). Birozdan keyin qayta urinib ko'ring.", reply_markup=get_main_keyboard())
     except Exception as e:
         bot.send_message(chat_id, f"[!] Xatolik yuz berdi: {e}", reply_markup=get_main_keyboard())
 
