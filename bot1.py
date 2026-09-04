@@ -156,7 +156,7 @@ def handle_cadastre(message):
     current_category = user_state.get(chat_id)
     
     if not current_category:
-        bot.send_message(chat_id, "Iltimos, avval yuqoridagi tugmalardan kategoriyani tanlang:", reply_markup=get_main_keyboard())
+        bot.send_message(chat_id, "Iltimos, avval quyidagi tugmalardan kategoriyani tanlang:", reply_markup=get_main_keyboard())
         return
 
     cadastre_number = message.text.strip()
