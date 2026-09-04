@@ -202,6 +202,7 @@ def show_history(message):
     else:
         bot.send_message(chat_id, "Sizda hali qidiruvlar tarixi mavjud emas.", reply_markup=get_main_keyboard())
 
+# KATEGoriya tanlash (faqat 'selecting_category' holatida ishlaydi)
 @bot.message_handler(func=lambda message: message.text in ["🏠 Turar joylar", "🏢 Noturar joylar", "🌾 Qishloq xo'jaligi yerlari"] and user_state.get(message.chat.id) == "selecting_category")
 def set_category(message):
     text = message.text
@@ -226,8 +227,8 @@ def set_category(message):
         reply_markup=get_back_to_cat_keyboard()
     )
 
-# Faqat kategoriya ichida turgan paytda kelgan matnni kadastr raqami deb qabul qilamiz
-@bot.message_handler(func=lambda message: user_state.get(message.chat.id) in ["turar", "noturar", "agr"])
+# KADASTR RAQAMINI QIDIRISH (Faqat kategoriya ichida bo'lganda va yuqoridagi tugmalar bosilmaganda ishlaydi)
+@bot.message_handler(func=lambda message: user_state.get(message.chat.id) in ["turar", "noturar", "agr"] and message.text not in ["🔙 Kategoriyalarga qaytish", "🔙 Orqaga"])
 def handle_cadastre(message):
     chat_id = message.chat.id
     current_category = user_state.get(chat_id)
