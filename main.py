@@ -192,13 +192,10 @@ def handle_cadastre(message):
     threading.Thread(target=process_cadastre_request, args=(chat_id, cadastre_number, api_url, cat_title)).start()
 
 def process_cadastre_request(chat_id, cadastre_number, api_url, cat_title):
-    # Brauzer sifatida ko'rsatish uchun kengaytirilgan sarlavhalar
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
         'Accept': 'application/json, text/plain, */*',
-        'Accept-Language': 'uz,en-US;q=0.9,en;q=0.8,ru;q=0.7',
-        'Referer': 'https://db.ngis.uz/',
-        'Origin': 'https://db.ngis.uz'
+        'Referer': 'https://db.ngis.uz/'
     }
     
     params = {
@@ -210,9 +207,8 @@ def process_cadastre_request(chat_id, cadastre_number, api_url, cat_title):
     }
     
     try:
-        # Sessiya ochib so'rov yuborish barqarorlikni oshiradi
-        session = requests.Session()
-        response = session.get(api_url, params=params, headers=headers, timeout=30)
+        # 50 sekund kutish vaqti
+        response = requests.get(api_url, params=params, headers=headers, timeout=50)
         data = response.json()
         
         if 'features' in data and len(data['features']) > 0:
@@ -250,7 +246,7 @@ def process_cadastre_request(chat_id, cadastre_number, api_url, cat_title):
             bot.send_message(chat_id, f"[-] '{cadastre_number}' raqami bo'yicha {cat_title} bazasidan ma'lumot topilmadi.", reply_markup=get_category_keyboard())
             
     except requests.exceptions.Timeout:
-        bot.send_message(chat_id, "[!] Bazadan javob kelishi juda cho'zilib ketdi. Iltimos, qaytadan urinib ko'ring.", reply_markup=get_category_keyboard())
+        bot.send_message(chat_id, "[!] Server ishlamayapti yoki vaqtincha javob bermayapti (50 sekund ichida javob kelmadi).", reply_markup=get_category_keyboard())
     except Exception as e:
         bot.send_message(chat_id, f"[!] Xatolik yuz berdi: {e}", reply_markup=get_category_keyboard())
 
