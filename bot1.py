@@ -1,3 +1,4 @@
+import threading
 import telebot
 import requests
 import json
@@ -15,6 +16,7 @@ except:
 
 HISTORY_FILE = "history.json"
 user_state = {}  # Foydalanuvchilarning joriy holati va tanlagan kategoriyasi
+user_timers = {} # Har bir foydalanuvchi uchun 30 sekundlik taymerni saqlash
 
 SERVICES = {
     "turar": {
@@ -45,14 +47,14 @@ def save_history(user_id, cadastre_number, category):
     str_user_id = str(user_id)
     if str_user_id not in history:
         history[str_user_id] = []
-    
+        
     entry = {
         "cadastre_number": cadastre_number,
         "category": category,
         "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     }
     history[str_user_id].append(entry)
-    
+        
     with open(HISTORY_FILE, 'w', encoding='utf-8') as f:
         json.dump(history, f, ensure_ascii=False, indent=4)
 
@@ -91,7 +93,36 @@ def create_kml(feature, cadastre_number):
         f.write(kml_content)
     return filename
 
-# Asosiy menyu (Har doim chiqib turadigan tugmalar)
+# Taymerni to'xtatish funksiyasi
+def clear_timer(chat_id):
+    if chat_id in user_timers:
+        user_timers[chat_id].cancel()
+        user_timers.pop(chat_id, None)
+
+# 30 sekund mobaynida hech narsa yozilmasa ishlaydigan funksiya
+def reset_due_to_timeout(chat_id):
+    if user_state.get(chat_id) and user_state.get(chat_id) != "selecting_category":
+        user_state[chat_id] = None
+        clear_timer(chat_id)
+        try:
+            bot.send_message(
+                chat_id, 
+                "⏱ 30 sekund davomida amal bajarilmadi va vaqt tugadi. Asosiy menyuga qaytdik:", 
+                reply_markup=get_main_keyboard()
+            )
+        except:
+            pass
+
+# Har bir harakatda taymerni qayta ishga tushirish (agar qidiruv rejimida bo'lsa)
+def reset_timer(chat_id):
+    clear_timer(chat_id)
+    # Faqat kategoriya tanlab kadastr raqami kutilayotgan paytda taymer ishlaydi
+    if user_state.get(chat_id) in ["turar", "noturar", "agr"]:
+        timer = threading.Timer(30, reset_due_to_timeout, args=[chat_id])
+        user_timers[chat_id] = timer
+        timer.start()
+
+# Asosiy menyu
 def get_main_keyboard():
     markup = ReplyKeyboardMarkup(resize_keyboard=True, row_width=1)
     markup.add(
@@ -121,6 +152,7 @@ def get_back_to_cat_keyboard():
 def send_welcome(message):
     chat_id = message.chat.id
     user_state[chat_id] = None
+    clear_timer(chat_id)
     photo_path = "kadastr_banner.jpg"
     
     welcome_text = (
@@ -137,36 +169,45 @@ def send_welcome(message):
 
 @bot.message_handler(func=lambda message: message.text == "🔍 Kadastr ma'lumotlarini izlash")
 def show_categories(message):
-    user_state[message.chat.id] = "selecting_category"
+    chat_id = message.chat.id
+    user_state[chat_id] = "selecting_category"
+    clear_timer(chat_id)
     bot.send_message(
-        message.chat.id, 
+        chat_id, 
         "Qaysi yo'nalish bo'yicha ma'lumot qidirmoqchisiz? Marhamat, quyidagilardan birini tanlang:", 
         reply_markup=get_category_keyboard()
     )
 
 @bot.message_handler(func=lambda message: message.text == "🔙 Orqaga")
 def go_to_main(message):
-    user_state[message.chat.id] = None
-    bot.send_message(message.chat.id, "Asosiy menyu:", reply_markup=get_main_keyboard())
+    chat_id = message.chat.id
+    user_state[chat_id] = None
+    clear_timer(chat_id)
+    bot.send_message(chat_id, "Asosiy menyu:", reply_markup=get_main_keyboard())
 
 @bot.message_handler(func=lambda message: message.text == "🔙 Kategoriyalarga qaytish")
 def back_to_categories(message):
-    user_state[message.chat.id] = "selecting_category"
-    bot.send_message(message.chat.id, "Kategoriyani tanlang:", reply_markup=get_category_keyboard())
+    chat_id = message.chat.id
+    user_state[chat_id] = "selecting_category"
+    clear_timer(chat_id)
+    bot.send_message(chat_id, "Kategoriyani tanlang:", reply_markup=get_category_keyboard())
 
 @bot.message_handler(commands=['tarix'])
 @bot.message_handler(func=lambda message: message.text == "📜 Tarixni ko'rish")
 def show_history(message):
+    chat_id = message.chat.id
+    user_state[chat_id] = None
+    clear_timer(chat_id)
     history = load_history()
-    str_user_id = str(message.chat.id)
+    str_user_id = str(chat_id)
     
     if str_user_id in history and history[str_user_id]:
         text = "📜 *Sizning qidiruvlar tarixingiz:*\n\n"
         for idx, item in enumerate(history[str_user_id], 1):
             text += f"{idx}. `{item['cadastre_number']}` ({item.get('category', '-')}) — _{item['date']}_\n"
-        bot.send_message(message.chat.id, text, parse_mode='HTML', reply_markup=get_main_keyboard())
+        bot.send_message(chat_id, text, parse_mode='HTML', reply_markup=get_main_keyboard())
     else:
-        bot.send_message(message.chat.id, "Sizda hali qidiruvlar tarixi mavjud emas.", reply_markup=get_main_keyboard())
+        bot.send_message(chat_id, "Sizda hali qidiruvlar tarixi mavjud emas.", reply_markup=get_main_keyboard())
 
 @bot.message_handler(func=lambda message: message.text in ["🏠 Turar joylar", "🏢 Noturar joylar", "🌾 Qishloq xo'jaligi yerlari"])
 def set_category(message):
@@ -183,9 +224,12 @@ def set_category(message):
         user_state[chat_id] = "agr"
         cat_name = "Qishloq xo'jaligi yerlari"
         
+    # Kategoriya tanlangach 30 sekundlik taymerni ishga tushiramiz
+    reset_timer(chat_id)
+        
     bot.send_message(
         chat_id, 
-        f"✅ *{cat_name}* tanlandi.\n\nEndi qidirish uchun **kadastr raqamini** kiriting (masalan: `14:07:42:03:01:0443`):", 
+        f"✅ *{cat_name}* tanlandi.\n\nEndi qidirish uchun **kadastr raqamini** kiriting (masalan: `14:07:42:03:01:0443`):\n\n_Eslatma: 30 sekund ichida ma'lumot kiritmasangiz, avtomatik ravishda bosh menyuga qaytasiz._", 
         parse_mode='Markdown',
         reply_markup=get_back_to_cat_keyboard()
     )
@@ -195,8 +239,9 @@ def handle_cadastre(message):
     chat_id = message.chat.id
     current_category = user_state.get(chat_id)
     
-    # Agar foydalanuvchi hech qanday qidiruv jarayonida bo'lmasa yoki shunchaki matn yozsa
+    # Agar foydalanuvchi hech qanday qidiruv jarayonida bo'lmasa
     if not current_category or current_category == "selecting_category":
+        clear_timer(chat_id)
         bot.send_message(
             chat_id, 
             "Iltimos, ma'lumot qidirish uchun quyidagi tugmani bosing:", 
@@ -204,6 +249,9 @@ def handle_cadastre(message):
         )
         return
         
+    # Har safar xabar yozganda taymerni to'xtatamiz (amal bajarildi)
+    clear_timer(chat_id)
+
     cadastre_number = message.text.strip()
     api_url = SERVICES[current_category]["url"]
     cat_title = SERVICES[current_category]["name"]
@@ -264,6 +312,9 @@ def handle_cadastre(message):
             
     except Exception as e:
         bot.send_message(chat_id, f"[!] Xatolik yuz berdi: {e}", reply_markup=get_back_to_cat_keyboard())
+        
+    # Natija chiqqandan keyin yana keyingi kadastr raqami uchun 30 sekundlik taymerni yoqib qo'yamiz
+    reset_timer(chat_id)
 
 if __name__ == '__main__':
     print("Bot ishga tushdi va ishlamoqda...")
