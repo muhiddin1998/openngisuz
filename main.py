@@ -113,7 +113,7 @@ def get_category_keyboard():
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
     chat_id = message.chat.id
-    user_state[chat_id] = None  # Qaysi jarayonda bo'lishidan qat'i nazar tozalaydi
+    user_state[chat_id] = None
     
     welcome_text = (
         "Assalomu alaykum! 🏛\n\n"
@@ -206,7 +206,8 @@ def process_cadastre_request(chat_id, cadastre_number, api_url, cat_title):
     }
     
     try:
-        response = requests.get(api_url, params=params, headers=headers, timeout=20)
+        # Vaqtni 30 sekundga uzaytirdik
+        response = requests.get(api_url, params=params, headers=headers, timeout=30)
         data = response.json()
         
         if 'features' in data and len(data['features']) > 0:
@@ -244,7 +245,7 @@ def process_cadastre_request(chat_id, cadastre_number, api_url, cat_title):
             bot.send_message(chat_id, f"[-] '{cadastre_number}' raqami bo'yicha {cat_title} bazasidan ma'lumot topilmadi.", reply_markup=get_category_keyboard())
             
     except requests.exceptions.Timeout:
-        bot.send_message(chat_id, "[!] Bazadan javob kelishi juda cho'zilib ketdi. Iltimos, qaytadan urinib ko'ring.", reply_markup=get_category_keyboard())
+        bot.send_message(chat_id, "[!] Bazadan javob kelishi juda cho'zilib ketdi (server band). Iltimos, qaytadan urinib ko'ring.", reply_markup=get_category_keyboard())
     except Exception as e:
         bot.send_message(chat_id, f"[!] Xatolik yuz berdi: {e}", reply_markup=get_category_keyboard())
 
