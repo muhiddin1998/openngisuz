@@ -15,7 +15,6 @@ except:
     pass
 
 HISTORY_FILE = "history.json"
-user_state = {}  
 
 SERVICES = {
     "turar": {
@@ -94,25 +93,18 @@ def create_kml(feature, cadastre_number):
 
 def get_main_keyboard():
     markup = ReplyKeyboardMarkup(resize_keyboard=True, row_width=1)
-    markup.add(
-        KeyboardButton("🏠 Turar joylar"),
-        KeyboardButton("🏢 Noturar joylar"),
-        KeyboardButton("🌾 Qishloq xo'jaligi yerlari"),
-        KeyboardButton("📜 Tarixni ko'rish")
-    )
+    markup.add(KeyboardButton("📜 Tarixni ko'rish"))
     return markup
 
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
     chat_id = message.chat.id
-    user_state[chat_id] = None
-    
     welcome_text = (
         "Assalomu alaykum! 🏛\n\n"
         "Elektron kadastr ma'lumotlar botiga xush kelibsiz.\n"
-        "Qaysi yo'nalish bo'yicha ma'lumot qidirmoqchisiz? Marhamat, quyidagilardan birini tanlang:"
+        "Menga kadastr raqamini yuboring (masalan: `14:07:42:03:01:0443`), men uni barcha bazalardan qidirib, ma'lumot va `.kml` faylini topib beraman."
     )
-    bot.send_message(chat_id, welcome_text, reply_markup=get_main_keyboard())
+    bot.send_message(chat_id, welcome_text, parse_mode='Markdown', reply_markup=get_main_keyboard())
 
 @bot.message_handler(func=lambda message: message.text == "📜 Tarixni ko'rish")
 def show_history(message):
@@ -124,50 +116,22 @@ def show_history(message):
         text = "📜 *Sizning qidiruvlar tarixingiz:*\n\n"
         for idx, item in enumerate(history[str_user_id], 1):
             text += f"{idx}. `{item['cadastre_number']}` ({item.get('category', '-')}) — _{item['date']}_\n"
-        bot.send_message(chat_id, text, parse_mode='Markdown', reply_markup=get_main_keyboard())
+        bot.send_message(chat_id, text, parse_mode='HTML', reply_markup=get_main_keyboard())
     else:
         bot.send_message(chat_id, "Sizda hali qidiruvlar tarixi mavjud emas.", reply_markup=get_main_keyboard())
 
-@bot.message_handler(func=lambda message: message.text in ["🏠 Turar joylar", "🏢 Noturar joylar", "🌾 Qishloq xo'jaligi yerlari"])
-def set_category(message):
-    chat_id = message.chat.id
-    text = message.text
-    
-    if "Turar joylar" in text:
-        user_state[chat_id] = "turar"
-        cat_name = "Turar joylar"
-    elif "Noturar joylar" in text:
-        user_state[chat_id] = "noturar"
-        cat_name = "Noturar joylar"
-    else:
-        user_state[chat_id] = "agr"
-        cat_name = "Qishloq xo'jaligi yerlari"
-        
-    bot.send_message(
-        chat_id, 
-        f"✅ *{cat_name}* tanlandi.\n\nEndi kadastr raqamini kiriting (masalan: `14:07:42:03:01:0443`):", 
-        parse_mode='Markdown',
-        reply_markup=get_main_keyboard()
-    )
-
-@bot.message_handler(func=lambda message: message.text not in ["🏠 Turar joylar", "🏢 Noturar joylar", "🌾 Qishloq xo'jaligi yerlari", "📜 Tarixni ko'rish"])
+@bot.message_handler(func=lambda message: True)
 def handle_cadastre(message):
     chat_id = message.chat.id
-    current_category = user_state.get(chat_id)
+    cadastre_number = message.text.strip()
     
-    if not current_category:
-        bot.send_message(chat_id, "Iltimos, avval pastdagi tugmalardan qaysi yo'nalish bo'yicha qidirishni tanlang:", reply_markup=get_main_keyboard())
+    if cadastre_number.startswith('/'):
         return
 
-    cadastre_number = message.text.strip()
-    api_url = SERVICES[current_category]["url"]
-    cat_title = SERVICES[current_category]["name"]
-    
-    bot.send_message(chat_id, f"🔍 {cat_title} bazasidan '{cadastre_number}' qidirilmoqda...")
-    
-    threading.Thread(target=process_cadastre_request, args=(chat_id, cadastre_number, api_url, cat_title)).start()
+    bot.send_message(chat_id, f"🔍 '{cadastre_number}' barcha bazalardan qidirilmoqda...")
+    threading.Thread(target=process_all_services, args=(chat_id, cadastre_number)).start()
 
-def process_cadastre_request(chat_id, cadastre_number, api_url, cat_title):
+def process_all_services(chat_id, cadastre_number):
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         'Referer': 'https://db.ngis.uz/'
@@ -181,48 +145,52 @@ def process_cadastre_request(chat_id, cadastre_number, api_url, cat_title):
         'outSR': '4326'
     }
     
-    try:
-        response = requests.get(api_url, params=params, headers=headers, timeout=20)
-        data = response.json()
-        
-        if 'features' in data and len(data['features']) > 0:
-            feature = data['features'][0]
-            attr = feature.get('attributes', {})
+    found = False
+    
+    for key, service in SERVICES.items():
+        try:
+            response = requests.get(service["url"], params=params, headers=headers, timeout=15)
+            data = response.json()
             
-            c_num = attr.get('cadastral_number', cadastre_number)
-            viloyat = attr.get('region_name', '-')
-            tuman = attr.get('district_name', '-')
-            mahalla_nomi = attr.get('mahalla_name', '-')
-            mahalla_kodi = attr.get('mahalla_code', '-')
-            maqsadi = attr.get('land_fund_type_description', attr.get('purpose_description', 'Aniqlanmagan'))
+            if 'features' in data and len(data['features']) > 0:
+                found = True
+                feature = data['features'][0]
+                attr = feature.get('attributes', {})
+                cat_title = service["name"]
+                
+                c_num = attr.get('cadastral_number', cadastre_number)
+                viloyat = attr.get('region_name', '-')
+                tuman = attr.get('district_name', '-')
+                mahalla_nomi = attr.get('mahalla_name', '-')
+                mahalla_kodi = attr.get('mahalla_code', '-')
+                maqsadi = attr.get('land_fund_type_description', attr.get('purpose_description', 'Aniqlanmagan'))
+                
+                text_result = (
+                    f"📋 *KADASTR MA'LUMOTLARI* ({cat_title})\n"
+                    "──────────────────────────────\n"
+                    f"🏷 *Kadastr raqami:* `{c_num}`\n"
+                    f"🗺 *Viloyat:* {viloyat}\n"
+                    f"🏛 *Tuman:* {tuman}\n"
+                    f"🏘 *Mahalla:* {mahalla_nomi}\n"
+                    f"🔑 *Mahalla kodi:* `{mahalla_kodi}`\n"
+                    f"🎯 *Maqsadi:* {maqsadi}\n"
+                    "──────────────────────────────"
+                )
+                
+                bot.send_message(chat_id, text_result, parse_mode='Markdown', reply_markup=get_main_keyboard())
+                save_history(chat_id, cadastre_number, cat_title)
+                
+                kml_file = create_kml(feature, cadastre_number)
+                if kml_file and os.path.exists(kml_file):
+                    with open(kml_file, 'rb') as f:
+                        bot.send_document(chat_id, f, caption="Xaritadagi kml fayli", reply_markup=get_main_keyboard())
+                    os.remove(kml_file)
+                break
+        except Exception as e:
+            continue
             
-            text_result = (
-                f"📋 *KADASTR MA'LUMOTLARI* ({cat_title})\n"
-                "──────────────────────────────\n"
-                f"🏷 *Kadastr raqami:* `{c_num}`\n"
-                f"🗺 *Viloyat:* {viloyat}\n"
-                f"🏛 *Tuman:* {tuman}\n"
-                f"🏘 *Mahalla:* {mahalla_nomi}\n"
-                f"🔑 *Mahalla kodi:* `{mahalla_kodi}`\n"
-                f"🎯 *Maqsadi:* {maqsadi}\n"
-                "──────────────────────────────"
-            )
-            
-            bot.send_message(chat_id, text_result, parse_mode='Markdown', reply_markup=get_main_keyboard())
-            save_history(chat_id, cadastre_number, cat_title)
-            
-            kml_file = create_kml(feature, cadastre_number)
-            if kml_file and os.path.exists(kml_file):
-                with open(kml_file, 'rb') as f:
-                    bot.send_document(chat_id, f, caption="Xaritadagi kml fayli", reply_markup=get_main_keyboard())
-                os.remove(kml_file)
-        else:
-            bot.send_message(chat_id, f"[-] '{cadastre_number}' raqami bo'yicha {cat_title} bazasidan ma'lumot topilmadi.", reply_markup=get_main_keyboard())
-            
-    except requests.exceptions.Timeout:
-        bot.send_message(chat_id, "[!] Bazadan javob kelishi juda cho'zilib ketdi. Iltimos, qaytadan urinib ko'ring.", reply_markup=get_main_keyboard())
-    except Exception as e:
-        bot.send_message(chat_id, f"[!] Xatolik yuz berdi: {e}", reply_markup=get_main_keyboard())
+    if not found:
+        bot.send_message(chat_id, f"[-] '{cadastre_number}' raqami bo'yicha hech qanday bazadan ma'lumot topilmadi.", reply_markup=get_main_keyboard())
 
 if __name__ == '__main__':
     print("Bot ishga tushdi va ishlamoqda...")
