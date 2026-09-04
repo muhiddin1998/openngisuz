@@ -16,7 +16,6 @@ except:
 
 HISTORY_FILE = "history.json"
 user_state = {}  
-user_timers = {} 
 
 SERVICES = {
     "turar": {
@@ -93,104 +92,31 @@ def create_kml(feature, cadastre_number):
         f.write(kml_content)
     return filename
 
-def clear_timer(chat_id):
-    if chat_id in user_timers:
-        user_timers[chat_id].cancel()
-        user_timers.pop(chat_id, None)
-
-def reset_due_to_timeout(chat_id):
-    if user_state.get(chat_id) and user_state.get(chat_id) != "selecting_category":
-        user_state[chat_id] = None
-        clear_timer(chat_id)
-        try:
-            bot.send_message(
-                chat_id, 
-                "⏱ 30 sekund davomida ma'lumot kiritilmadi va vaqt tugadi. Asosiy menyuga qaytdik:", 
-                reply_markup=get_main_keyboard()
-            )
-        except:
-            pass
-
-def reset_timer(chat_id):
-    clear_timer(chat_id)
-    if user_state.get(chat_id) in ["turar", "noturar", "agr"]:
-        timer = threading.Timer(30, reset_due_to_timeout, args=[chat_id])
-        user_timers[chat_id] = timer
-        timer.start()
-
 def get_main_keyboard():
-    markup = ReplyKeyboardMarkup(resize_keyboard=True, row_width=1)
-    markup.add(
-        KeyboardButton("🔍 Kadastr ma'lumotlarini izlash"),
-        KeyboardButton("📜 Tarixni ko'rish")
-    )
-    return markup
-
-def get_category_keyboard():
     markup = ReplyKeyboardMarkup(resize_keyboard=True, row_width=1)
     markup.add(
         KeyboardButton("🏠 Turar joylar"),
         KeyboardButton("🏢 Noturar joylar"),
         KeyboardButton("🌾 Qishloq xo'jaligi yerlari"),
-        KeyboardButton("🔙 Orqaga")
+        KeyboardButton("📜 Tarixni ko'rish")
     )
-    return markup
-
-def get_back_to_cat_keyboard():
-    markup = ReplyKeyboardMarkup(resize_keyboard=True)
-    markup.add(KeyboardButton("🔙 Kategoriyalarga qaytish"))
     return markup
 
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
     chat_id = message.chat.id
     user_state[chat_id] = None
-    clear_timer(chat_id)
     
-    photo_path = "kadastr_banner.jpg"
     welcome_text = (
         "Assalomu alaykum! 🏛\n\n"
         "Elektron kadastr ma'lumotlar botiga xush kelibsiz.\n"
-        "Ma'lumot qidirish uchun quyidagi tugmani bosing:"
+        "Qidirish uchun quyidagi kategoriyalardan birini tanlang:"
     )
-    
-    if os.path.exists(photo_path):
-        with open(photo_path, 'rb') as photo:
-            bot.send_photo(chat_id, photo, caption=welcome_text, reply_markup=get_main_keyboard())
-    else:
-        bot.send_message(chat_id, welcome_text, reply_markup=get_main_keyboard())
+    bot.send_message(chat_id, welcome_text, reply_markup=get_main_keyboard())
 
-@bot.message_handler(func=lambda message: message.text == "🔍 Kadastr ma'lumotlarini izlash")
-def show_categories(message):
-    chat_id = message.chat.id
-    user_state[chat_id] = "selecting_category"
-    clear_timer(chat_id)
-    bot.send_message(
-        chat_id, 
-        "Qaysi yo'nalish bo'yicha ma'lumot qidirmoqchisiz? Marhamat, quyidagilardan birini tanlang:", 
-        reply_markup=get_category_keyboard()
-    )
-
-@bot.message_handler(func=lambda message: message.text == "🔙 Orqaga")
-def go_to_main(message):
-    chat_id = message.chat.id
-    user_state[chat_id] = None
-    clear_timer(chat_id)
-    bot.send_message(chat_id, "Asosiy menyu:", reply_markup=get_main_keyboard())
-
-@bot.message_handler(func=lambda message: message.text == "🔙 Kategoriyalarga qaytish")
-def back_to_categories(message):
-    chat_id = message.chat.id
-    user_state[chat_id] = "selecting_category"
-    clear_timer(chat_id)
-    bot.send_message(chat_id, "Kategoriyani tanlang:", reply_markup=get_category_keyboard())
-
-@bot.message_handler(commands=['tarix'])
 @bot.message_handler(func=lambda message: message.text == "📜 Tarixni ko'rish")
 def show_history(message):
     chat_id = message.chat.id
-    user_state[chat_id] = None
-    clear_timer(chat_id)
     history = load_history()
     str_user_id = str(chat_id)
     
@@ -202,10 +128,10 @@ def show_history(message):
     else:
         bot.send_message(chat_id, "Sizda hali qidiruvlar tarixi mavjud emas.", reply_markup=get_main_keyboard())
 
-@bot.message_handler(func=lambda message: message.text in ["🏠 Turar joylar", "🏢 Noturar joylar", "🌾 Qishloq xo'jaligi yerlari"] and user_state.get(message.chat.id) == "selecting_category")
+@bot.message_handler(func=lambda message: message.text in ["🏠 Turar joylar", "🏢 Noturar joylar", "🌾 Qishloq xo'jaligi yerlari"])
 def set_category(message):
-    text = message.text
     chat_id = message.chat.id
+    text = message.text
     
     if "Turar joylar" in text:
         user_state[chat_id] = "turar"
@@ -217,30 +143,29 @@ def set_category(message):
         user_state[chat_id] = "agr"
         cat_name = "Qishloq xo'jaligi yerlari"
         
-    reset_timer(chat_id)
-        
     bot.send_message(
         chat_id, 
-        f"✅ *{cat_name}* tanlandi.\n\nEndi qidirish uchun **kadastr raqamini** kiriting (masalan: `14:07:42:03:01:0443`):\n\n_Eslatma: 30 sekund ichida ma'lumot kiritmasangiz, avtomatik ravishda bosh menyuga qaytasiz._", 
+        f"✅ *{cat_name}* tanlandi.\n\nEndi kadastr raqamini kiriting (masalan: `14:07:42:03:01:0443`):", 
         parse_mode='Markdown',
-        reply_markup=get_back_to_cat_keyboard()
+        reply_markup=get_main_keyboard()
     )
 
-@bot.message_handler(func=lambda message: user_state.get(message.chat.id) in ["turar", "noturar", "agr"] and message.text not in ["🔙 Kategoriyalarga qaytish", "🔙 Orqaga"])
+@bot.message_handler(func=lambda message: True)
 def handle_cadastre(message):
     chat_id = message.chat.id
     current_category = user_state.get(chat_id)
     
-    clear_timer(chat_id)
+    if not current_category:
+        bot.send_message(chat_id, "Iltimos, avval yuqoridagi tugmalardan kategoriyani tanlang:", reply_markup=get_main_keyboard())
+        return
+
     cadastre_number = message.text.strip()
     api_url = SERVICES[current_category]["url"]
     cat_title = SERVICES[current_category]["name"]
     
     bot.send_message(chat_id, f"🔍 {cat_title} bazasidan '{cadastre_number}' qidirilmoqda...")
     
-    # So'rovni alohida oqimda (thread) bajarish qotishning oldini oladi
     threading.Thread(target=process_cadastre_request, args=(chat_id, cadastre_number, api_url, cat_title)).start()
-    reset_timer(chat_id)
 
 def process_cadastre_request(chat_id, cadastre_number, api_url, cat_title):
     params = {
@@ -278,21 +203,21 @@ def process_cadastre_request(chat_id, cadastre_number, api_url, cat_title):
                 "──────────────────────────────"
             )
             
-            bot.send_message(chat_id, text_result, parse_mode='Markdown', reply_markup=get_back_to_cat_keyboard())
+            bot.send_message(chat_id, text_result, parse_mode='Markdown', reply_markup=get_main_keyboard())
             save_history(chat_id, cadastre_number, cat_title)
             
             kml_file = create_kml(feature, cadastre_number)
             if kml_file and os.path.exists(kml_file):
                 with open(kml_file, 'rb') as f:
-                    bot.send_document(chat_id, f, caption="Xaritadagi kml fayli", reply_markup=get_back_to_cat_keyboard())
+                    bot.send_document(chat_id, f, caption="Xaritadagi kml fayli", reply_markup=get_main_keyboard())
                 os.remove(kml_file)
         else:
-            bot.send_message(chat_id, f"[-] '{cadastre_number}' raqami bo'yicha {cat_title} bazasidan hech qanday ma'lumot topilmadi.", reply_markup=get_back_to_cat_keyboard())
+            bot.send_message(chat_id, f"[-] '{cadastre_number}' raqami bo'yicha {cat_title} bazasidan hech qanday ma'lumot topilmadi.", reply_markup=get_main_keyboard())
             
     except requests.exceptions.Timeout:
-        bot.send_message(chat_id, "[!] Bazadan javob kelishi juda cho'zilib ketdi (server vaqtincha ishlamayapti). Iltimos, qaytadan urinib ko'ring.", reply_markup=get_back_to_cat_keyboard())
+        bot.send_message(chat_id, "[!] Bazadan javob kelishi juda cho'zilib ketdi (server vaqtincha ishlamayapti). Iltimos, qaytadan urinib ko'ring.", reply_markup=get_main_keyboard())
     except Exception as e:
-        bot.send_message(chat_id, f"[!] Xatolik yuz berdi: {e}", reply_markup=get_back_to_cat_keyboard())
+        bot.send_message(chat_id, f"[!] Xatolik yuz berdi: {e}", reply_markup=get_main_keyboard())
 
 if __name__ == '__main__':
     print("Bot ishga tushdi va ishlamoqda...")
