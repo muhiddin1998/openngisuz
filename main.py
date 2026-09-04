@@ -110,20 +110,13 @@ def send_welcome(message):
     welcome_text = (
         "Assalomu alaykum! 🏛\n\n"
         "Elektron kadastr ma'lumotlar botiga xush kelibsiz.\n"
-        "Kerakli yo'nalishni tanlang:"
+        "Qidirish uchun avval quyidagi tugmalardan birini tanlang:"
     )
     bot.send_message(chat_id, welcome_text, reply_markup=get_main_keyboard())
-
-@bot.message_handler(func=lambda message: message.text in ["🔙 Asosiy menyu", "Orqaga"])
-def go_back(message):
-    chat_id = message.chat.id
-    user_state[chat_id] = None
-    bot.send_message(chat_id, "Asosiy menyu:", reply_markup=get_main_keyboard())
 
 @bot.message_handler(func=lambda message: message.text == "📜 Tarixni ko'rish")
 def show_history(message):
     chat_id = message.chat.id
-    user_state[chat_id] = None
     history = load_history()
     str_user_id = str(chat_id)
     
@@ -160,26 +153,14 @@ def set_category(message):
 @bot.message_handler(func=lambda message: True)
 def handle_cadastre(message):
     chat_id = message.chat.id
-    text = message.text.strip()
+    cadastre_number = message.text.strip()
     
-    # Agar foydalanuvchi tasodifan tugma bosib yuborsa, uni qidiruvga bermaslik
-    if text in ["🏠 Turar joylar", "🏢 Noturar joylar", "🌾 Qishloq xo'jaligi yerlari"]:
-        set_category(message)
-        return
-    if text == "📜 Tarixni ko'rish":
-        show_history(message)
-        return
-    if text in ["🔙 Asosiy menyu", "Orqaga"]:
-        go_back(message)
-        return
-
     current_category = user_state.get(chat_id)
     
     if not current_category:
-        bot.send_message(chat_id, "Iltimos, avval quyidagi menyudan yo'nalishni tanlang:", reply_markup=get_main_keyboard())
+        bot.send_message(chat_id, "⚠️ Iltimos, avval pastdagi tugmalardan birortasi orqali kategoriyani tanlang:", reply_markup=get_main_keyboard())
         return
 
-    cadastre_number = text
     api_url = SERVICES[current_category]["url"]
     cat_title = SERVICES[current_category]["name"]
     
