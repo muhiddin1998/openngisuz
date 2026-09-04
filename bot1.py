@@ -226,7 +226,6 @@ def set_category(message):
         reply_markup=get_back_to_cat_keyboard()
     )
 
-# Barcha menyu tugmalarini chetlab o'tuvchi xavfsiz qidiruv funksiyasi
 @bot.message_handler(func=lambda message: message.text not in [
     "🔍 Kadastr ma'lumotlarini izlash", 
     "📜 Tarixni ko'rish", 
