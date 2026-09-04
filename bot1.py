@@ -198,9 +198,9 @@ def show_history(message):
         text = "📜 *Sizning qidiruvlar tarixingiz:*\n\n"
         for idx, item in enumerate(history[str_user_id], 1):
             text += f"{idx}. `{item['cadastre_number']}` ({item.get('category', '-')}) — _{item['date']}_\n"
-        bot.send_message(chat_id, text, parse_mode='HTML', reply_markup=get_main_keyboard())
+        bot.send_message(chat_id, text, parse_mode='HTML', reply_markup=get_main_keyword())
     else:
-        bot.send_message(chat_id, "Sizda hali qidiruvlar tarixi mavjud emas.", reply_markup=get_main_keyboard())
+        bot.send_message(chat_id, "Sizda hali qidiruvlar tarixi mavjud emas.", reply_markup=get_main_keyword())
 
 @bot.message_handler(func=lambda message: message.text in ["🏠 Turar joylar", "🏢 Noturar joylar", "🌾 Qishloq xo'jaligi yerlari"])
 def set_category(message):
@@ -285,6 +285,7 @@ def handle_cadastre(message):
                 "──────────────────────────────"
             )
             
+            # Ma'lumot topilganda faqat pastda turadi, kategoriya menyusini ochib yubormaydi, yangi kadastr kiritish mumkin
             bot.send_message(chat_id, text_result, parse_mode='Markdown', reply_markup=get_back_to_cat_keyboard())
             save_history(chat_id, cadastre_number, cat_title)
             
@@ -294,6 +295,7 @@ def handle_cadastre(message):
                     bot.send_document(chat_id, f, caption="Xaritadagi kml fayli", reply_markup=get_back_to_cat_keyboard())
                 os.remove(kml_file)
         else:
+            # Topilmasa xabar beriladi
             bot.send_message(chat_id, f"[-] '{cadastre_number}' raqami bo'yicha {cat_title} bazasidan hech qanday ma'lumot topilmadi.", reply_markup=get_back_to_cat_keyboard())
             
     except Exception as e:
