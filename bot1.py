@@ -136,14 +136,7 @@ def get_category_keyboard():
     )
     return markup
 
-# Kadastr raqamini so'rash vaqtida chiqadigan tugma (topilmaganda ham shu qoladi)
 def get_back_to_cat_keyboard():
-    markup = ReplyKeyboardMarkup(resize_keyboard=True)
-    markup.add(KeyboardButton("🔙 Kategoriyalarga qaytish"))
-    return markup
-
-# Ma'lumot topilgandan keyin chiqadigan maxsus tugma
-def get_after_result_keyboard():
     markup = ReplyKeyboardMarkup(resize_keyboard=True)
     markup.add(KeyboardButton("🔙 Kategoriyalarga qaytish"))
     return markup
@@ -209,7 +202,7 @@ def show_history(message):
     else:
         bot.send_message(chat_id, "Sizda hali qidiruvlar tarixi mavjud emas.", reply_markup=get_main_keyboard())
 
-@bot.message_handler(func=lambda message: message.text in ["🏠 Turar joylar", "🏢 Noturar joylar", "🌾 Qishloq xo'jaligi yerlari"])
+@bot.message_handler(func=lambda message: message.text in ["🏠 Turar joylar", "🏢 Noturar joylar", "🌾 Qishloq xo'jaligi yerlari"] and user_state.get(message.chat.id) == "selecting_category")
 def set_category(message):
     text = message.text
     chat_id = message.chat.id
@@ -233,22 +226,12 @@ def set_category(message):
         reply_markup=get_back_to_cat_keyboard()
     )
 
-@bot.message_handler(func=lambda message: message.text not in [
-    "🔍 Kadastr ma'lumotlarini izlash", 
-    "📜 Tarixni ko'rish", 
-    "🏠 Turar joylar", 
-    "🏢 Noturar joylar", 
-    "🌾 Qishloq xo'jaligi yerlari", 
-    "🔙 Orqaga", 
-    "🔙 Kategoriyalarga qaytish"
-])
+# Faqat kategoriya ichida turgan paytda kelgan matnni kadastr raqami deb qabul qilamiz
+@bot.message_handler(func=lambda message: user_state.get(message.chat.id) in ["turar", "noturar", "agr"])
 def handle_cadastre(message):
     chat_id = message.chat.id
     current_category = user_state.get(chat_id)
     
-    if not current_category or current_category == "selecting_category":
-        return
-        
     clear_timer(chat_id)
 
     cadastre_number = message.text.strip()
@@ -266,7 +249,7 @@ def handle_cadastre(message):
     }
     
     try:
-        response = requests.get(api_url, params=params)
+        response = requests.get(api_url, params=params, timeout=15)
         data = response.json()
         
         if 'features' in data and len(data['features']) > 0:
@@ -292,19 +275,19 @@ def handle_cadastre(message):
                 "──────────────────────────────"
             )
             
-            # Ma'lumot topilganda maxsus tugma chiqariladi
-            bot.send_message(chat_id, text_result, parse_mode='Markdown', reply_markup=get_after_result_keyboard())
+            bot.send_message(chat_id, text_result, parse_mode='Markdown', reply_markup=get_back_to_cat_keyboard())
             save_history(chat_id, cadastre_number, cat_title)
             
             kml_file = create_kml(feature, cadastre_number)
             if kml_file and os.path.exists(kml_file):
                 with open(kml_file, 'rb') as f:
-                    bot.send_document(chat_id, f, caption="Xaritadagi kml fayli", reply_markup=get_after_result_keyboard())
+                    bot.send_document(chat_id, f, caption="Xaritadagi kml fayli", reply_markup=get_back_to_cat_keyboard())
                 os.remove(kml_file)
         else:
-            # Ma'lumot topilmasa o'sha turgan oynada (kadastr kiritish oynasida) qoladi
             bot.send_message(chat_id, f"[-] '{cadastre_number}' raqami bo'yicha {cat_title} bazasidan hech qanday ma'lumot topilmadi.", reply_markup=get_back_to_cat_keyboard())
             
+    except requests.exceptions.Timeout:
+        bot.send_message(chat_id, "[!] Bazadan javob kelishi juda cho'zilib ketdi (server vaqtincha ishlamayapti). Iltimos, qaytadan urinib ko'ring.", reply_markup=get_back_to_cat_keyboard())
     except Exception as e:
         bot.send_message(chat_id, f"[!] Xatolik yuz berdi: {e}", reply_markup=get_back_to_cat_keyboard())
         
