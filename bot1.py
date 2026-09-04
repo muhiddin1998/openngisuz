@@ -141,7 +141,6 @@ def get_back_to_cat_keyboard():
     markup.add(KeyboardButton("🔙 Kategoriyalarga qaytish"))
     return markup
 
-# /start komandasi - hammasini tozalab boshlang'ich holatga keltiradi
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
     chat_id = message.chat.id
@@ -203,7 +202,6 @@ def show_history(message):
     else:
         bot.send_message(chat_id, "Sizda hali qidiruvlar tarixi mavjud emas.", reply_markup=get_main_keyboard())
 
-# Kategoriya tanlash (faqat 'selecting_category' holatida ishlaydi)
 @bot.message_handler(func=lambda message: message.text in ["🏠 Turar joylar", "🏢 Noturar joylar", "🌾 Qishloq xo'jaligi yerlari"] and user_state.get(message.chat.id) == "selecting_category")
 def set_category(message):
     text = message.text
@@ -228,20 +226,23 @@ def set_category(message):
         reply_markup=get_back_to_cat_keyboard()
     )
 
-# Kadastr raqamini qidirish
 @bot.message_handler(func=lambda message: user_state.get(message.chat.id) in ["turar", "noturar", "agr"] and message.text not in ["🔙 Kategoriyalarga qaytish", "🔙 Orqaga"])
 def handle_cadastre(message):
     chat_id = message.chat.id
     current_category = user_state.get(chat_id)
     
     clear_timer(chat_id)
-
     cadastre_number = message.text.strip()
     api_url = SERVICES[current_category]["url"]
     cat_title = SERVICES[current_category]["name"]
     
     bot.send_message(chat_id, f"🔍 {cat_title} bazasidan '{cadastre_number}' qidirilmoqda...")
     
+    # So'rovni alohida oqimda (thread) bajarish qotishning oldini oladi
+    threading.Thread(target=process_cadastre_request, args=(chat_id, cadastre_number, api_url, cat_title)).start()
+    reset_timer(chat_id)
+
+def process_cadastre_request(chat_id, cadastre_number, api_url, cat_title):
     params = {
         'where': f"cadastral_number = '{cadastre_number}'",
         'outFields': '*',
@@ -292,8 +293,6 @@ def handle_cadastre(message):
         bot.send_message(chat_id, "[!] Bazadan javob kelishi juda cho'zilib ketdi (server vaqtincha ishlamayapti). Iltimos, qaytadan urinib ko'ring.", reply_markup=get_back_to_cat_keyboard())
     except Exception as e:
         bot.send_message(chat_id, f"[!] Xatolik yuz berdi: {e}", reply_markup=get_back_to_cat_keyboard())
-        
-    reset_timer(chat_id)
 
 if __name__ == '__main__':
     print("Bot ishga tushdi va ishlamoqda...")
