@@ -4,7 +4,7 @@ import requests
 import json
 import os
 from datetime import datetime
-from telebot.types import ReplyKeyboardMarkup, KeyboardButton
+from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardRemove
 
 TOKEN = "8797770726:AAGHJvpFtm2_x5CD6bvLWfmregFRvvD-OPU"
 bot = telebot.TeleBot(TOKEN)
@@ -92,14 +92,19 @@ def create_kml(feature, cadastre_number):
         f.write(kml_content)
     return filename
 
-def get_main_keyboard():
-    markup = ReplyKeyboardMarkup(resize_keyboard=True, row_width=1)
+def get_category_keyboard():
+    markup = InlineKeyboardMarkup(row_width=1)
     markup.add(
-        KeyboardButton("🏠 Turar joylar"),
-        KeyboardButton("🏢 Noturar joylar"),
-        KeyboardButton("🌾 Qishloq xo'jaligi yerlari"),
-        KeyboardButton("📜 Tarixni ko'rish")
+        InlineKeyboardButton("🏠 Turar joylar", callback_data="cat_turar"),
+        InlineKeyboardButton("🏢 Noturar joylar", callback_data="cat_noturar"),
+        InlineKeyboardButton("🌾 Qishloq xo'jaligi yerlari", callback_data="cat_agr"),
+        InlineKeyboardButton("📜 Tarixni ko'rish", callback_data="show_history")
     )
+    return markup
+
+def get_back_keyboard():
+    markup = InlineKeyboardMarkup()
+    markup.add(InlineKeyboardButton("🔙 Kategoriyalarga qaytish", callback_data="back_to_menu"))
     return markup
 
 @bot.message_handler(commands=['start'])
@@ -112,51 +117,70 @@ def send_welcome(message):
         "Elektron kadastr ma'lumotlar botiga xush kelibsiz.\n"
         "Qaysi yo'nalish bo'yicha ma'lumot qidirmoqchisiz? Marhamat, quyidagilardan birini tanlang:"
     )
-    bot.send_message(chat_id, welcome_text, reply_markup=get_main_keyboard())
+    bot.send_message(chat_id, welcome_text, reply_markup=get_category_keyboard())
 
-@bot.message_handler(func=lambda message: message.text == "📜 Tarixni ko'rish")
-def show_history(message):
-    chat_id = message.chat.id
-    history = load_history()
-    str_user_id = str(chat_id)
+@bot.callback_query_handler(func=lambda call: True)
+def handle_callback(call):
+    chat_id = call.message.chat.id
+    data = call.data
     
-    if str_user_id in history and history[str_user_id]:
-        text = "📜 *Sizning qidiruvlar tarixingiz:*\n\n"
-        for idx, item in enumerate(history[str_user_id], 1):
-            text += f"{idx}. `{item['cadastre_number']}` ({item.get('category', '-')}) — _{item['date']}_\n"
-        bot.send_message(chat_id, text, parse_mode='HTML', reply_markup=get_main_keyboard())
-    else:
-        bot.send_message(chat_id, "Sizda hali qidiruvlar tarixi mavjud emas.", reply_markup=get_main_keyboard())
-
-@bot.message_handler(func=lambda message: message.text in ["🏠 Turar joylar", "🏢 Noturar joylar", "🌾 Qishloq xo'jaligi yerlari"])
-def set_category(message):
-    chat_id = message.chat.id
-    text = message.text
+    bot.answer_callback_query(call.id)
     
-    if "Turar joylar" in text:
+    if data == "cat_turar":
         user_state[chat_id] = "turar"
-        cat_name = "Turar joylar"
-    elif "Noturar joylar" in text:
+        bot.edit_message_text(
+            "✅ *Turar joylar* tanlandi.\n\nEndi kadastr raqamini kiriting (masalan: `14:07:42:03:01:0443`):", 
+            chat_id, 
+            call.message.message_id, 
+            parse_mode='Markdown',
+            reply_markup=get_back_keyboard()
+        )
+    elif data == "cat_noturar":
         user_state[chat_id] = "noturar"
-        cat_name = "Noturar joylar"
-    else:
+        bot.edit_message_text(
+            "✅ *Noturar joylar* tanlandi.\n\nEndi kadastr raqamini kiriting (masalan: `14:07:42:03:01:0443`):", 
+            chat_id, 
+            call.message.message_id, 
+            parse_mode='Markdown',
+            reply_markup=get_back_keyboard()
+        )
+    elif data == "cat_agr":
         user_state[chat_id] = "agr"
-        cat_name = "Qishloq xo'jaligi yerlari"
+        bot.edit_message_text(
+            "✅ *Qishloq xo'jaligi yerlari* tanlandi.\n\nEndi kadastr raqamini kiriting (masalan: `14:07:42:03:01:0443`):", 
+            chat_id, 
+            call.message.message_id, 
+            parse_mode='Markdown',
+            reply_markup=get_back_keyboard()
+        )
+    elif data == "show_history":
+        history = load_history()
+        str_user_id = str(chat_id)
         
-    bot.send_message(
-        chat_id, 
-        f"✅ *{cat_name}* tanlandi.\n\nEndi kadastr raqamini kiriting (masalan: `14:07:42:03:01:0443`):", 
-        parse_mode='Markdown',
-        reply_markup=get_main_keyboard()
-    )
+        if str_user_id in history and history[str_user_id]:
+            text = "📜 *Sizning qidiruvlar tarixingiz:*\n\n"
+            for idx, item in enumerate(history[str_user_id], 1):
+                text += f"{idx}. `{item['cadastre_number']}` ({item.get('category', '-')}) — _{item['date']}_\n"
+        else:
+            text = "Sizda hali qidiruvlar tarixi mavjud emas."
+            
+        bot.edit_message_text(text, chat_id, call.message.message_id, parse_mode='Markdown', reply_markup=get_back_keyboard())
+    elif data == "back_to_menu":
+        user_state[chat_id] = None
+        bot.edit_message_text(
+            "Qaysi yo'nalish bo'yicha ma'lumot qidirmoqchisiz? Marhamat, quyidagilardan birini tanlang:", 
+            chat_id, 
+            call.message.message_id, 
+            reply_markup=get_category_keyboard()
+        )
 
-@bot.message_handler(func=lambda message: message.text not in ["🏠 Turar joylar", "🏢 Noturar joylar", "🌾 Qishloq xo'jaligi yerlari", "📜 Tarixni ko'rish"])
+@bot.message_handler(func=lambda message: True)
 def handle_cadastre(message):
     chat_id = message.chat.id
     current_category = user_state.get(chat_id)
     
     if not current_category:
-        bot.send_message(chat_id, "Iltimos, avval yuqoridagi tugmalardan qaysi yo'nalish bo'yicha qidirishni tanlang:", reply_markup=get_main_keyboard())
+        bot.send_message(chat_id, "Iltimos, avval /start buyrug'ini bosing yoki quyidagi menyudan foydalaning:", reply_markup=get_category_keyboard())
         return
 
     cadastre_number = message.text.strip()
@@ -203,21 +227,21 @@ def process_cadastre_request(chat_id, cadastre_number, api_url, cat_title):
                 "──────────────────────────────"
             )
             
-            bot.send_message(chat_id, text_result, parse_mode='Markdown', reply_markup=get_main_keyboard())
+            bot.send_message(chat_id, text_result, parse_mode='Markdown', reply_markup=get_category_keyboard())
             save_history(chat_id, cadastre_number, cat_title)
             
             kml_file = create_kml(feature, cadastre_number)
             if kml_file and os.path.exists(kml_file):
                 with open(kml_file, 'rb') as f:
-                    bot.send_document(chat_id, f, caption="Xaritadagi kml fayli", reply_markup=get_main_keyboard())
+                    bot.send_document(chat_id, f, caption="Xaritadagi kml fayli", reply_markup=get_category_keyboard())
                 os.remove(kml_file)
         else:
-            bot.send_message(chat_id, f"[-] '{cadastre_number}' raqami bo'yicha {cat_title} bazasidan hech qanday ma'lumot topilmadi.", reply_markup=get_main_keyboard())
+            bot.send_message(chat_id, f"[-] '{cadastre_number}' raqami bo'yicha {cat_title} bazasidan hech qanday ma'lumot topilmadi.", reply_markup=get_category_keyboard())
             
     except requests.exceptions.Timeout:
-        bot.send_message(chat_id, "[!] Bazadan javob kelishi juda cho'zilib ketdi (server vaqtincha ishlamayapti). Iltimos, qaytadan urinib ko'ring.", reply_markup=get_main_keyboard())
+        bot.send_message(chat_id, "[!] Bazadan javob kelishi juda cho'zilib ketdi (server vaqtincha ishlamayapti). Iltimos, qaytadan urinib ko'ring.", reply_markup=get_category_keyboard())
     except Exception as e:
-        bot.send_message(chat_id, f"[!] Xatolik yuz berdi: {e}", reply_markup=get_main_keyboard())
+        bot.send_message(chat_id, f"[!] Xatolik yuz berdi: {e}", reply_markup=get_category_keyboard())
 
 if __name__ == '__main__':
     print("Bot ishga tushdi va ishlamoqda...")
