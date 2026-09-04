@@ -15,8 +15,8 @@ except:
     pass
 
 HISTORY_FILE = "history.json"
-user_state = {}  # Foydalanuvchilarning joriy holati
-user_timers = {} # Taymerlarni saqlash
+user_state = {}  
+user_timers = {} 
 
 SERVICES = {
     "turar": {
@@ -136,7 +136,14 @@ def get_category_keyboard():
     )
     return markup
 
+# Kadastr raqamini so'rash vaqtida chiqadigan tugma (topilmaganda ham shu qoladi)
 def get_back_to_cat_keyboard():
+    markup = ReplyKeyboardMarkup(resize_keyboard=True)
+    markup.add(KeyboardButton("🔙 Kategoriyalarga qaytish"))
+    return markup
+
+# Ma'lumot topilgandan keyin chiqadigan maxsus tugma
+def get_after_result_keyboard():
     markup = ReplyKeyboardMarkup(resize_keyboard=True)
     markup.add(KeyboardButton("🔙 Kategoriyalarga qaytish"))
     return markup
@@ -198,9 +205,9 @@ def show_history(message):
         text = "📜 *Sizning qidiruvlar tarixingiz:*\n\n"
         for idx, item in enumerate(history[str_user_id], 1):
             text += f"{idx}. `{item['cadastre_number']}` ({item.get('category', '-')}) — _{item['date']}_\n"
-        bot.send_message(chat_id, text, parse_mode='HTML', reply_markup=get_main_keyword())
+        bot.send_message(chat_id, text, parse_mode='HTML', reply_markup=get_main_keyboard())
     else:
-        bot.send_message(chat_id, "Sizda hali qidiruvlar tarixi mavjud emas.", reply_markup=get_main_keyword())
+        bot.send_message(chat_id, "Sizda hali qidiruvlar tarixi mavjud emas.", reply_markup=get_main_keyboard())
 
 @bot.message_handler(func=lambda message: message.text in ["🏠 Turar joylar", "🏢 Noturar joylar", "🌾 Qishloq xo'jaligi yerlari"])
 def set_category(message):
@@ -285,17 +292,17 @@ def handle_cadastre(message):
                 "──────────────────────────────"
             )
             
-            # Ma'lumot topilganda faqat pastda turadi, kategoriya menyusini ochib yubormaydi, yangi kadastr kiritish mumkin
-            bot.send_message(chat_id, text_result, parse_mode='Markdown', reply_markup=get_back_to_cat_keyboard())
+            # Ma'lumot topilganda maxsus tugma chiqariladi
+            bot.send_message(chat_id, text_result, parse_mode='Markdown', reply_markup=get_after_result_keyboard())
             save_history(chat_id, cadastre_number, cat_title)
             
             kml_file = create_kml(feature, cadastre_number)
             if kml_file and os.path.exists(kml_file):
                 with open(kml_file, 'rb') as f:
-                    bot.send_document(chat_id, f, caption="Xaritadagi kml fayli", reply_markup=get_back_to_cat_keyboard())
+                    bot.send_document(chat_id, f, caption="Xaritadagi kml fayli", reply_markup=get_after_result_keyboard())
                 os.remove(kml_file)
         else:
-            # Topilmasa xabar beriladi
+            # Ma'lumot topilmasa o'sha turgan oynada (kadastr kiritish oynasida) qoladi
             bot.send_message(chat_id, f"[-] '{cadastre_number}' raqami bo'yicha {cat_title} bazasidan hech qanday ma'lumot topilmadi.", reply_markup=get_back_to_cat_keyboard())
             
     except Exception as e:
