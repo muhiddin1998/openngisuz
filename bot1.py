@@ -110,7 +110,7 @@ def send_welcome(message):
     welcome_text = (
         "Assalomu alaykum! 🏛\n\n"
         "Elektron kadastr ma'lumotlar botiga xush kelibsiz.\n"
-        "Qidirish uchun quyidagi kategoriyalardan birini tanlang:"
+        "Qaysi yo'nalish bo'yicha ma'lumot qidirmoqchisiz? Marhamat, quyidagilardan birini tanlang:"
     )
     bot.send_message(chat_id, welcome_text, reply_markup=get_main_keyboard())
 
@@ -150,13 +150,13 @@ def set_category(message):
         reply_markup=get_main_keyboard()
     )
 
-@bot.message_handler(func=lambda message: True)
+@bot.message_handler(func=lambda message: message.text not in ["🏠 Turar joylar", "🏢 Noturar joylar", "🌾 Qishloq xo'jaligi yerlari", "📜 Tarixni ko'rish"])
 def handle_cadastre(message):
     chat_id = message.chat.id
     current_category = user_state.get(chat_id)
     
     if not current_category:
-        bot.send_message(chat_id, "Iltimos, avval quyidagi tugmalardan kategoriyani tanlang:", reply_markup=get_main_keyboard())
+        bot.send_message(chat_id, "Iltimos, avval yuqoridagi tugmalardan qaysi yo'nalish bo'yicha qidirishni tanlang:", reply_markup=get_main_keyboard())
         return
 
     cadastre_number = message.text.strip()
