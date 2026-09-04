@@ -102,13 +102,6 @@ def get_main_keyboard():
     )
     return markup
 
-def get_back_keyboard():
-    markup = ReplyKeyboardMarkup(resize_keyboard=True, row_width=1)
-    markup.add(
-        KeyboardButton("🔙 Asosiy menyu")
-    )
-    return markup
-
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
     chat_id = message.chat.id
@@ -161,19 +154,32 @@ def set_category(message):
         chat_id, 
         f"✅ *{cat_name}* tanlandi.\n\nEndi kadastr raqamini kiriting (masalan: `14:07:42:03:01:0443`):", 
         parse_mode='Markdown',
-        reply_markup=get_back_keyboard()
+        reply_markup=get_main_keyboard()
     )
 
 @bot.message_handler(func=lambda message: True)
 def handle_cadastre(message):
     chat_id = message.chat.id
+    text = message.text.strip()
+    
+    # Agar foydalanuvchi tasodifan tugma bosib yuborsa, uni qidiruvga bermaslik
+    if text in ["🏠 Turar joylar", "🏢 Noturar joylar", "🌾 Qishloq xo'jaligi yerlari"]:
+        set_category(message)
+        return
+    if text == "📜 Tarixni ko'rish":
+        show_history(message)
+        return
+    if text in ["🔙 Asosiy menyu", "Orqaga"]:
+        go_back(message)
+        return
+
     current_category = user_state.get(chat_id)
     
     if not current_category:
-        bot.send_message(chat_id, "Iltimos, quyidagi menyudan kerakli yo'nalishni tanlang:", reply_markup=get_main_keyboard())
+        bot.send_message(chat_id, "Iltimos, avval quyidagi menyudan yo'nalishni tanlang:", reply_markup=get_main_keyboard())
         return
 
-    cadastre_number = message.text.strip()
+    cadastre_number = text
     api_url = SERVICES[current_category]["url"]
     cat_title = SERVICES[current_category]["name"]
     
@@ -232,7 +238,7 @@ def process_cadastre_request(chat_id, cadastre_number, api_url, cat_title):
                     bot.send_document(chat_id, f, caption="Xaritadagi kml fayli", reply_markup=get_main_keyboard())
                 os.remove(kml_file)
         else:
-            bot.send_message(chat_id, f"[-] '{cadastre_number}' raqami bo'yicha {cat_title} bazasidan ma'lumot topilmadi.", reply_markup=get_main_keyboard())
+            bot.send_message(chat_id, f"[-] '{cadastre_number}' raqami bo'yicha {cat_title} bazasidan hech qanday ma'lumot topilmadi.", reply_markup=get_main_keyboard())
             
     except requests.exceptions.Timeout:
         bot.send_message(chat_id, "[!] Server ishlamayapti yoki vaqtincha javob bermayapti (50 sekund ichida javob kelmadi).", reply_markup=get_main_keyboard())
