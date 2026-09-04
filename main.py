@@ -113,7 +113,7 @@ def get_category_keyboard():
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
     chat_id = message.chat.id
-    user_state[chat_id] = None
+    user_state[chat_id] = None  # Qaysi jarayonda bo'lishidan qat'i nazar tozalaydi
     
     welcome_text = (
         "Assalomu alaykum! 🏛\n\n"
@@ -131,7 +131,7 @@ def choose_category_menu(message):
         reply_markup=get_category_keyboard()
     )
 
-@bot.message_handler(func=lambda message: message.text == "🔙 Asosiy menyu")
+@bot.message_handler(func=lambda message: message.text in ["🔙 Asosiy menyu", "Orqaga"])
 def go_back(message):
     chat_id = message.chat.id
     user_state[chat_id] = None
@@ -140,6 +140,7 @@ def go_back(message):
 @bot.message_handler(func=lambda message: message.text == "📜 Tarixni ko'rish")
 def show_history(message):
     chat_id = message.chat.id
+    user_state[chat_id] = None
     history = load_history()
     str_user_id = str(chat_id)
     
@@ -198,7 +199,6 @@ def process_cadastre_request(chat_id, cadastre_number, api_url, cat_title):
     
     params = {
         'where': f"cadastral_number LIKE '%{cadastre_number}%'",
-        *params if 'params' in locals() else [],
         'outFields': '*',
         'f': 'json',
         'returnGeometry': 'true',
