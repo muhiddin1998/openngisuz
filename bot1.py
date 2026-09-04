@@ -4,7 +4,7 @@ import requests
 import json
 import os
 from datetime import datetime
-from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardRemove
+from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 TOKEN = "8797770726:AAGHJvpFtm2_x5CD6bvLWfmregFRvvD-OPU"
 bot = telebot.TeleBot(TOKEN)
@@ -180,7 +180,7 @@ def handle_cadastre(message):
     current_category = user_state.get(chat_id)
     
     if not current_category:
-        bot.send_message(chat_id, "Iltimos, avval /start buyrug'ini bosing yoki quyidagi menyudan foydalaning:", reply_markup=get_category_keyboard())
+        bot.send_message(chat_id, "Iltimos, avval /start buyrug'ini bosing yoki quyidagi tugmadan foydalaning:", reply_markup=get_category_keyboard())
         return
 
     cadastre_number = message.text.strip()
@@ -192,8 +192,14 @@ def handle_cadastre(message):
     threading.Thread(target=process_cadastre_request, args=(chat_id, cadastre_number, api_url, cat_title)).start()
 
 def process_cadastre_request(chat_id, cadastre_number, api_url, cat_title):
+    # Brauzerdagidek to'g'ri so'rov ketishi uchun headers qo'shamiz
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Referer': 'https://db.ngis.uz/'
+    }
+    
     params = {
-        'where': f"cadastral_number = '{cadastre_number}'",
+        'where': f"cadastral_number LIKE '%{cadastre_number}%'",
         'outFields': '*',
         'f': 'json',
         'returnGeometry': 'true',
@@ -201,7 +207,8 @@ def process_cadastre_request(chat_id, cadastre_number, api_url, cat_title):
     }
     
     try:
-        response = requests.get(api_url, params=params, timeout=15)
+        response = requests.get(api_url, params=params, headers=headers, timeout=20)
+        print("API Response Status:", response.status_code) # Konsolda ko'rinadi
         data = response.json()
         
         if 'features' in data and len(data['features']) > 0:
@@ -236,10 +243,10 @@ def process_cadastre_request(chat_id, cadastre_number, api_url, cat_title):
                     bot.send_document(chat_id, f, caption="Xaritadagi kml fayli", reply_markup=get_category_keyboard())
                 os.remove(kml_file)
         else:
-            bot.send_message(chat_id, f"[-] '{cadastre_number}' raqami bo'yicha {cat_title} bazasidan hech qanday ma'lumot topilmadi.", reply_markup=get_category_keyboard())
+            bot.send_message(chat_id, f"[-] '{cadastre_number}' raqami bo'yicha {cat_title} bazasidan ma'lumot topilmadi.", reply_markup=get_category_keyboard())
             
     except requests.exceptions.Timeout:
-        bot.send_message(chat_id, "[!] Bazadan javob kelishi juda cho'zilib ketdi (server vaqtincha ishlamayapti). Iltimos, qaytadan urinib ko'ring.", reply_markup=get_category_keyboard())
+        bot.send_message(chat_id, "[!] Bazadan javob kelishi juda cho'zilib ketdi. Iltimos, qaytadan urinib ko'ring.", reply_markup=get_category_keyboard())
     except Exception as e:
         bot.send_message(chat_id, f"[!] Xatolik yuz berdi: {e}", reply_markup=get_category_keyboard())
 
