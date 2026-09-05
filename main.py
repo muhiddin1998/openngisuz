@@ -17,6 +17,7 @@ except:
 HISTORY_FILE = "history.json"
 user_state = {}  
 
+# Har bir kategoriya o'zining aniq URL manziliga ega
 SERVICES = {
     "turar": {
         "name": "🏠 Turar joylar",
@@ -92,7 +93,6 @@ def create_kml(feature, cadastre_number):
         f.write(kml_content)
     return filename
 
-# 1. Asosiy menyu
 def get_main_keyboard():
     markup = ReplyKeyboardMarkup(resize_keyboard=True, row_width=1)
     markup.add(
@@ -101,7 +101,6 @@ def get_main_keyboard():
     )
     return markup
 
-# 2. Kategoriyalar menyusi
 def get_categories_keyboard():
     markup = ReplyKeyboardMarkup(resize_keyboard=True, row_width=1)
     markup.add(
@@ -112,7 +111,6 @@ def get_categories_keyboard():
     )
     return markup
 
-# 3. Kadastr raqamini kiritish paytidagi menyu
 def get_input_keyboard():
     markup = ReplyKeyboardMarkup(resize_keyboard=True, row_width=1)
     markup.add(
@@ -121,7 +119,6 @@ def get_input_keyboard():
     )
     return markup
 
-# 4. Natija chiqqandagi menyu
 def get_result_keyboard():
     markup = ReplyKeyboardMarkup(resize_keyboard=True, row_width=1)
     markup.add(
@@ -134,7 +131,6 @@ def get_result_keyboard():
 def send_welcome(message):
     chat_id = message.chat.id
     user_state[chat_id] = None
-    
     welcome_text = (
         "Assalomu alaykum! 🏛\n\n"
         "Elektron kadastr ma'lumotlar botiga xush kelibsiz.\n"
@@ -178,7 +174,7 @@ def show_history(message):
         
     bot.send_message(chat_id, text, parse_mode='HTML', reply_markup=get_result_keyboard())
 
-@bot.message_handler(func=lambda message: message.text in ["🏠 Turar joylar", "🏢 Noturar joylar", "🌾 Qishloq xo'jaligi yerlari", "Turar joylar", "Noturar joylar", "Qishloq xo'jaligi yerlari"])
+@bot.message_handler(func=lambda message: message.text in ["🏠 Turar joylar", "🏢 Noturar joylar", "🌾 Qishloq xo'jaligi yerlari"])
 def set_category(message):
     chat_id = message.chat.id
     text = message.text
@@ -226,18 +222,29 @@ def process_cadastre_request(chat_id, cadastre_number, api_url, cat_title):
         'Referer': 'https://db.ngis.uz/'
     }
     
-    # Barcha mumkin bo'lgan maydon nomlari bo'yicha qidiruv sharti
+    # Bazadagi ustun nomlari turlicha bo'lishi mumkinligi uchun bir nechta variantda qidiramiz
     params = {
-        'where': f"cadastral_number = '{cadastre_number}' OR cadastral_number LIKE '%{cadastre_number}%' OR kadastr = '{cadastre_number}'",
+        'where': f"cadastral_number LIKE '%{cadastre_number}%' OR kadastr LIKE '%{cadastre_number}%' OR cad_num LIKE '%{cadastre_number}%'",
         'outFields': '*',
         'f': 'json',
         'returnGeometry': 'true',
-        'outSR': '4326'
+        'outSR': '4326',
+        'resultRecordCount': 5
     }
     
     try:
-        response = session.get(api_url, params=params, headers=headers, timeout=30)
+        response = session.get(api_url, params=params, headers=headers, timeout=20)
+        
+        if response.status_code != 200:
+            bot.send_message(chat_id, f"[!] Server xato kod qaytardi: HTTP {response.status_code}", reply_markup=get_result_keyboard())
+            return
+            
         data = response.json()
+        
+        if 'error' in data:
+            err_msg = data['error'].get('message', 'ArcGIS xatosi')
+            bot.send_message(chat_id, f"[!] Server xabari: {err_msg}", reply_markup=get_result_keyboard())
+            return
         
         if 'features' in data and len(data['features']) > 0:
             feature = data['features'][0]
@@ -274,7 +281,7 @@ def process_cadastre_request(chat_id, cadastre_number, api_url, cat_title):
             bot.send_message(chat_id, f"[-] '{cadastre_number}' raqami bo'yicha {cat_title} bazasidan ma'lumot topilmadi.", reply_markup=get_result_keyboard())
             
     except requests.exceptions.Timeout:
-        bot.send_message(chat_id, "[!] Server vaqtincha javob bermayapti (30 sekund ichida javob kelmadi). Iltimos, qaytadan urinib ko'ring.", reply_markup=get_result_keyboard())
+        bot.send_message(chat_id, "[!] Server javob berish vaqtini uzaytirdi. Baza vaqtincha o'chgan yoki band bo'lishi mumkin.", reply_markup=get_result_keyboard())
     except Exception as e:
         bot.send_message(chat_id, f"[!] Xatolik yuz berdi: {e}", reply_markup=get_result_keyboard())
 
