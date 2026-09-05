@@ -101,7 +101,7 @@ def get_main_keyboard():
     )
     return markup
 
-# 2. Emojili kategoriyalar menyusi
+# 2. Kategoriyalar menyusi (emojilar bilan)
 def get_categories_keyboard():
     markup = ReplyKeyboardMarkup(resize_keyboard=True, row_width=1)
     markup.add(
@@ -226,8 +226,9 @@ def process_cadastre_request(chat_id, cadastre_number, api_url, cat_title):
         'Referer': 'https://db.ngis.uz/'
     }
     
+    # ArcGIS server uchun qidiruv query shartini to'g'rilash (ham aniq moslash, ham qism bo'yicha qidirishni tekshirish)
     params = {
-        'where': f"cadastral_number LIKE '%{cadastre_number}%'",
+        'where': f"cadastral_number = '{cadastre_number}' OR cadastral_number LIKE '%{cadastre_number}%'",
         'outFields': '*',
         'f': 'json',
         'returnGeometry': 'true',
