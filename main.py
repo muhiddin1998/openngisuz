@@ -101,7 +101,7 @@ def get_main_keyboard():
     )
     return markup
 
-# 2. Kategoriyalar menyusi (emojilar bilan)
+# 2. Kategoriyalar menyusi
 def get_categories_keyboard():
     markup = ReplyKeyboardMarkup(resize_keyboard=True, row_width=1)
     markup.add(
@@ -226,9 +226,9 @@ def process_cadastre_request(chat_id, cadastre_number, api_url, cat_title):
         'Referer': 'https://db.ngis.uz/'
     }
     
-    # ArcGIS server uchun qidiruv query shartini to'g'rilash (ham aniq moslash, ham qism bo'yicha qidirishni tekshirish)
+    # Barcha mumkin bo'lgan maydon nomlari bo'yicha qidiruv sharti
     params = {
-        'where': f"cadastral_number = '{cadastre_number}' OR cadastral_number LIKE '%{cadastre_number}%'",
+        'where': f"cadastral_number = '{cadastre_number}' OR cadastral_number LIKE '%{cadastre_number}%' OR kadastr = '{cadastre_number}'",
         'outFields': '*',
         'f': 'json',
         'returnGeometry': 'true',
@@ -243,10 +243,10 @@ def process_cadastre_request(chat_id, cadastre_number, api_url, cat_title):
             feature = data['features'][0]
             attr = feature.get('attributes', {})
             
-            c_num = attr.get('cadastral_number', cadastre_number)
-            viloyat = attr.get('region_name', '-')
-            tuman = attr.get('district_name', '-')
-            mahalla_nomi = attr.get('mahalla_name', '-')
+            c_num = attr.get('cadastral_number', attr.get('kadastr', cadastre_number))
+            viloyat = attr.get('region_name', attr.get('viloyat', '-'))
+            tuman = attr.get('district_name', attr.get('tuman', '-'))
+            mahalla_nomi = attr.get('mahalla_name', attr.get('mahalla', '-'))
             mahalla_kodi = attr.get('mahalla_code', '-')
             maqsadi = attr.get('land_fund_type_description', attr.get('purpose_description', 'Aniqlanmagan'))
             
