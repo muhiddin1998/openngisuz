@@ -92,7 +92,7 @@ def create_kml(feature, cadastre_number):
         f.write(kml_content)
     return filename
 
-# 1. Start menyusi
+# 1. Asosiy menyu
 def get_main_keyboard():
     markup = ReplyKeyboardMarkup(resize_keyboard=True, row_width=1)
     markup.add(
@@ -101,18 +101,18 @@ def get_main_keyboard():
     )
     return markup
 
-# 2. Kategoriyalar menyusi
+# 2. Emojili kategoriyalar menyusi
 def get_categories_keyboard():
     markup = ReplyKeyboardMarkup(resize_keyboard=True, row_width=1)
     markup.add(
-        KeyboardButton("Turar joylar"),
-        KeyboardButton("Noturar joylar"),
-        KeyboardButton("Qishloq xo'jaligi yerlari"),
+        KeyboardButton("🏠 Turar joylar"),
+        KeyboardButton("🏢 Noturar joylar"),
+        KeyboardButton("🌾 Qishloq xo'jaligi yerlari"),
         KeyboardButton("🔙 Orqaga qaytish")
     )
     return markup
 
-# 3. Raqam kiritish menyusi
+# 3. Kadastr raqamini kiritish paytidagi menyu
 def get_input_keyboard():
     markup = ReplyKeyboardMarkup(resize_keyboard=True, row_width=1)
     markup.add(
@@ -121,7 +121,7 @@ def get_input_keyboard():
     )
     return markup
 
-# 4. Natija/Tarix menyusi
+# 4. Natija chiqqandagi menyu
 def get_result_keyboard():
     markup = ReplyKeyboardMarkup(resize_keyboard=True, row_width=1)
     markup.add(
@@ -178,24 +178,24 @@ def show_history(message):
         
     bot.send_message(chat_id, text, parse_mode='HTML', reply_markup=get_result_keyboard())
 
-@bot.message_handler(func=lambda message: message.text in ["Turar joylar", "Noturar joylar", "Qishloq xo'jaligi yerlari", "🏠 Turar joylar", "🏢 Noturar joylar", "🌾 Qishloq xo'jaligi yerlari"])
+@bot.message_handler(func=lambda message: message.text in ["🏠 Turar joylar", "🏢 Noturar joylar", "🌾 Qishloq xo'jaligi yerlari", "Turar joylar", "Noturar joylar", "Qishloq xo'jaligi yerlari"])
 def set_category(message):
     chat_id = message.chat.id
     text = message.text
     
     if "Turar" in text:
         user_state[chat_id] = "turar"
-        cat_name = "Turar joylar"
+        cat_name = "🏠 Turar joylar"
     elif "Noturar" in text:
         user_state[chat_id] = "noturar"
-        cat_name = "Noturar joylar"
+        cat_name = "🏢 Noturar joylar"
     else:
         user_state[chat_id] = "agr"
-        cat_name = "Qishloq xo'jaligi yerlari"
+        cat_name = "🌾 Qishloq xo'jaligi yerlari"
         
     bot.send_message(
         chat_id, 
-        f"✅ *{cat_name}* tanlandi.\n\nKadastr raqamini kiriting (masalan: `14:07:42:03:01:0443`):", 
+        f"✅ *{cat_name}* tanlandi.\n\nEndi ushbu bo'limga tegishli kadastr raqamini kiriting (masalan: `14:07:42:03:01:0443`):", 
         parse_mode='Markdown',
         reply_markup=get_input_keyboard()
     )
