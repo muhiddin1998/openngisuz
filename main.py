@@ -17,7 +17,6 @@ except:
 HISTORY_FILE = "history.json"
 user_state = {}  
 
-# Har bir kategoriya o'zining aniq URL manziliga ega
 SERVICES = {
     "turar": {
         "name": "🏠 Turar joylar",
@@ -222,18 +221,18 @@ def process_cadastre_request(chat_id, cadastre_number, api_url, cat_title):
         'Referer': 'https://db.ngis.uz/'
     }
     
-    # Bazadagi ustun nomlari turlicha bo'lishi mumkinligi uchun bir nechta variantda qidiramiz
+    # Server qotib qolmasligi uchun aniq tenglik (=) sharti ishlatiladi
     params = {
-        'where': f"cadastral_number LIKE '%{cadastre_number}%' OR kadastr LIKE '%{cadastre_number}%' OR cad_num LIKE '%{cadastre_number}%'",
+        'where': f"cadastral_number = '{cadastre_number}' OR kadastr = '{cadastre_number}' OR cad_num = '{cadastre_number}'",
         'outFields': '*',
         'f': 'json',
         'returnGeometry': 'true',
         'outSR': '4326',
-        'resultRecordCount': 5
+        'resultRecordCount': 1
     }
     
     try:
-        response = session.get(api_url, params=params, headers=headers, timeout=20)
+        response = session.get(api_url, params=params, headers=headers, timeout=15)
         
         if response.status_code != 200:
             bot.send_message(chat_id, f"[!] Server xato kod qaytardi: HTTP {response.status_code}", reply_markup=get_result_keyboard())
@@ -281,7 +280,7 @@ def process_cadastre_request(chat_id, cadastre_number, api_url, cat_title):
             bot.send_message(chat_id, f"[-] '{cadastre_number}' raqami bo'yicha {cat_title} bazasidan ma'lumot topilmadi.", reply_markup=get_result_keyboard())
             
     except requests.exceptions.Timeout:
-        bot.send_message(chat_id, "[!] Server javob berish vaqtini uzaytirdi. Baza vaqtincha o'chgan yoki band bo'lishi mumkin.", reply_markup=get_result_keyboard())
+        bot.send_message(chat_id, "[!] Server javob berish vaqtini uzaytirdi. Baza vaqtincha band.", reply_markup=get_result_keyboard())
     except Exception as e:
         bot.send_message(chat_id, f"[!] Xatolik yuz berdi: {e}", reply_markup=get_result_keyboard())
 
